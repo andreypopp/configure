@@ -3,6 +3,21 @@
     configure -- configuration toolkit
     ==================================
 
+    This module provides wrapper around PyYAML with the following features:
+
+        * intepolation for string values
+
+        * configuration merging
+
+        * configuration inheritance (via 'extends' top-level attribute)
+
+    Basic usage is:
+
+        >>> from configure import Configuration
+        >>> c = Configuration.from_file("./example.conf")
+        >>> c.settings["a"]
+        2
+
 """
 
 from os import path
@@ -98,7 +113,7 @@ class Configuration(MutableMapping):
     def configure(self, struct):
         """ Configure with other configuration object"""
         if isinstance(struct, self.__class__):
-            struct = struct._Config__struct
+            struct = struct._Configuration__struct
         self.__struct = struct
 
     def __repr__(self):
@@ -109,7 +124,13 @@ class Configuration(MutableMapping):
     @classmethod
     def from_file(cls, filename, ctx=None):
         """ Construct :class:`.Configuration` object by reading and parsing file
-        ``filename``."""
+        ``filename``.
+
+        :param filename:
+            filename to parse config from
+        :param ctx:
+            mapping object used for value interpolation
+        """
         with open(filename, "r") as f:
             cfg = cls(load(f.read()), ctx=ctx)
         if "extends" in cfg:
@@ -120,12 +141,24 @@ class Configuration(MutableMapping):
 
     @classmethod
     def from_string(cls, string, ctx=None):
-        """ Construct :class:`.Configuration` from ``string``."""
+        """ Construct :class:`.Configuration` from ``string``.
+
+        :param string:
+            string to parse config from
+        :param ctx:
+            mapping object used for value interpolation
+        """
         return cls(load(string), ctx=ctx)
 
     @classmethod
     def from_dict(cls, d, ctx=None):
-        """ Construct :class:`.Configuration` from dict ``d``."""
+        """ Construct :class:`.Configuration` from dict ``d``.
+
+        :param d:
+            mapping object to use for config
+        :param ctx:
+            mapping object used for value interpolation
+        """
         return cls(d, ctx=ctx)
 
 def _timedelta_contructor(loader, node):
