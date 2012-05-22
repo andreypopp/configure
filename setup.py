@@ -5,7 +5,7 @@ version = "0.1"
 setup(
     name="configure",
     version=version,
-    description="configuration toolkit",
+    description="configuration toolkit based on YAML",
     author="Andrey Popp",
     author_email="8mayday@gmail.com",
     py_modules=["configure"],
