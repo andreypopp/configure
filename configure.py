@@ -20,6 +20,7 @@
 
 """
 
+from re import compile as re_compile
 from os import path
 from collections import MutableMapping, Mapping
 from datetime import timedelta
@@ -190,6 +191,7 @@ def _timedelta_contructor(loader, node):
 def load(stream):
     loader = Loader(stream)
     loader.add_constructor("!timedelta", _timedelta_contructor)
+    loader.add_constructor("!re", re_compile)
     try:
         return loader.get_single_data()
     finally:
