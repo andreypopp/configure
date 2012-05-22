@@ -19,7 +19,13 @@ class ConfigurationError(ValueError):
     """ Configuration error"""
 
 class Configuration(MutableMapping):
-    """ Configuration object"""
+    """ Configuration
+
+    You should never instantiate this object but use ``from_file``,
+    ``from_string`` or ``from_dict`` classmethods instead.
+
+    Implements :class:`collections.MutableMapping` protocol.
+    """
 
     def __init__(self, struct=None, ctx=None):
         self.__struct = struct
@@ -73,12 +79,14 @@ class Configuration(MutableMapping):
         for k, v in config.items():
             if isinstance(v, Mapping) and k in self:
                 if not isinstance(self[k], Mapping):
-                    raise ConfigurationError("unresolveable conflict during merge")
+                    raise ConfigurationError(
+                        "unresolveable conflict during merge")
                 self[k]._merge(v)
             else:
                 self[k] = v
 
     def merge(self, config):
+        """ Merge configuration into this one"""
         new = self.__class__({})
         new._merge(self)
         new._merge(config)
@@ -88,6 +96,7 @@ class Configuration(MutableMapping):
         return self.merge(config)
 
     def configure(self, struct):
+        """ Configure with other configuration object"""
         if isinstance(struct, self.__class__):
             struct = struct._Config__struct
         self.__struct = struct
@@ -99,6 +108,8 @@ class Configuration(MutableMapping):
 
     @classmethod
     def from_file(cls, filename, ctx=None):
+        """ Construct :class:`.Configuration` object by reading and parsing file
+        ``filename``."""
         with open(filename, "r") as f:
             cfg = cls(load(f.read()), ctx=ctx)
         if "extends" in cfg:
@@ -109,10 +120,12 @@ class Configuration(MutableMapping):
 
     @classmethod
     def from_string(cls, string, ctx=None):
+        """ Construct :class:`.Configuration` from ``string``."""
         return cls(load(string), ctx=ctx)
 
     @classmethod
     def from_dict(cls, d, ctx=None):
+        """ Construct :class:`.Configuration` from dict ``d``."""
         return cls(d, ctx=ctx)
 
 def _timedelta_contructor(loader, node):
