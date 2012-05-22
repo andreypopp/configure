@@ -188,10 +188,14 @@ def _timedelta_contructor(loader, node):
         raise ConfigurationError(
             "value '%s' cannot be interpreted as date range" % item)
 
+def _re_constructor(loader, node):
+    item = loader.construct_scalar(node)
+    return re_compile(item)
+
 def load(stream):
     loader = Loader(stream)
     loader.add_constructor("!timedelta", _timedelta_contructor)
-    loader.add_constructor("!re", re_compile)
+    loader.add_constructor("!re", _re_constructor)
     try:
         return loader.get_single_data()
     finally:
