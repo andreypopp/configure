@@ -29,7 +29,7 @@ try:
 except ImportError:
     from yaml import Loader
 
-__all__ = ("Configuration", "ConfigurationError")
+__all__ = ("Configuration", "ConfigurationError", "configure_logging")
 
 class ConfigurationError(ValueError):
     """ Configuration error"""
@@ -161,6 +161,64 @@ class Configuration(MutableMapping):
             mapping object used for value interpolation
         """
         return cls(d, ctx=ctx)
+
+def configure_logging(logcfg=None, disable_existing_loggers=True):
+    """ Configure logging in a sane way
+
+    :param logcfg:
+        may be a. a dict suitable for :func:`logging.config.dictConfig`, b.
+        "syslog" string or c. None
+    :param disable_existing_loggers:
+        if we need to disable existing loggers
+    """
+    if logcfg is not None:
+        if logcfg == "syslog":
+            logcfg = {
+                "handlers": {
+                    "syslog": {
+                        "class": "logging.handlers.SysLogHandler"
+                    }
+                },
+                "root": {
+                    "handlers": ["syslog"],
+                    "level": "NOTSET"
+                }
+            }
+    else:
+        logcfg = {
+            "handlers": {
+                "console": {
+                    "class": "logging.StreamHandler",
+                    "level": "INFO",
+                }
+            }
+        }
+
+    if not "version" in logcfg:
+        logcfg["version"] = 1
+
+    if not "disable_existing_loggers" in logcfg:
+        logcfg["disable_existing_loggers"] = disable_existing_loggers
+
+    if not "root" in logcfg:
+        logcfg["root"] = {
+            "handlers": ["console"],
+            "level": "NOTSET"
+        }
+
+    if not "syslog" in logcfg.get("handlers", {}):
+        logcfg.setdefault("handlers", {})["syslog"] = {
+            "class": "logging.handlers.SysLogHandler"
+        }
+
+    if not "console" in logcfg.get("handlers", {}):
+        logcfg.setdefault("handlers", {})["console"] = {
+            "class": "logging.StreamHandler",
+            "level": "INFO",
+        }
+
+    from logging.config import dictConfig
+    dictConfig(logcfg)
 
 def _timedelta_contructor(loader, node):
     item = loader.construct_scalar(node)
