@@ -176,7 +176,9 @@ def configure_logging(logcfg=None, disable_existing_loggers=True):
             logcfg = {
                 "handlers": {
                     "syslog": {
-                        "class": "logging.handlers.SysLogHandler"
+                        "class": "logging.handlers.SysLogHandler",
+                        "level": "INFO",
+                        "formatter": "precise",
                     }
                 },
                 "root": {
@@ -212,7 +214,6 @@ def configure_logging(logcfg=None, disable_existing_loggers=True):
     if not "precise" in logcfg["formatters"]:
         logcfg["formatters"]["precise"] = {
             "format": "%(asctime)s %(levelname)-8s %(name)-15s %(message)s",
-            "datefmt": "%Y-%m-%d %H:%M:%S",
         }
 
     if not "root" in logcfg:
