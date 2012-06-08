@@ -177,7 +177,6 @@ def configure_logging(logcfg=None, disable_existing_loggers=True):
                 "handlers": {
                     "syslog": {
                         "class": "logging.handlers.SysLogHandler",
-                        "level": "INFO",
                         "formatter": "precise",
                     }
                 },
@@ -191,8 +190,8 @@ def configure_logging(logcfg=None, disable_existing_loggers=True):
             "handlers": {
                 "console": {
                     "class": "logging.StreamHandler",
-                    "level": "INFO",
                     "formatter": "precise",
+                    "level": "NOTSET",
                 }
             }
         }
@@ -230,7 +229,7 @@ def configure_logging(logcfg=None, disable_existing_loggers=True):
     if not "console" in logcfg.get("handlers", {}):
         logcfg.setdefault("handlers", {})["console"] = {
             "class": "logging.StreamHandler",
-            "level": "INFO",
+            "level": "NOTSET",
         }
 
     from logging.config import dictConfig
