@@ -181,7 +181,7 @@ def configure_logging(logcfg=None, disable_existing_loggers=True):
                 },
                 "root": {
                     "handlers": ["syslog"],
-                    "level": "NOTSET"
+                    "level": "NOTSET",
                 }
             }
     else:
@@ -190,6 +190,7 @@ def configure_logging(logcfg=None, disable_existing_loggers=True):
                 "console": {
                     "class": "logging.StreamHandler",
                     "level": "INFO",
+                    "formatter": "precise",
                 }
             }
         }
@@ -200,10 +201,24 @@ def configure_logging(logcfg=None, disable_existing_loggers=True):
     if not "disable_existing_loggers" in logcfg:
         logcfg["disable_existing_loggers"] = disable_existing_loggers
 
+    if not "formatters" in logcfg:
+        logcfg["formatters"] = {}
+
+    if not "brief" in logcfg["formatters"]:
+        logcfg["formatters"]["brief"] = {
+            "format": "%(message)s",
+        }
+
+    if not "precise" in logcfg["formatters"]:
+        logcfg["formatters"]["precise"] = {
+            "format": "%(asctime)s %(levelname)-8s %(name)-15s %(message)s",
+            "datefmt": "%Y-%m-%d %H:%M:%S",
+        }
+
     if not "root" in logcfg:
         logcfg["root"] = {
             "handlers": ["console"],
-            "level": "NOTSET"
+            "level": "NOTSET",
         }
 
     if not "syslog" in logcfg.get("handlers", {}):
