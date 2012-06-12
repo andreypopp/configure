@@ -123,7 +123,7 @@ class Configuration(MutableMapping):
     __str__ = __repr__
 
     @classmethod
-    def from_file(cls, filename, ctx=None):
+    def from_file(cls, filename, ctx=None, constructors=None):
         """ Construct :class:`.Configuration` object by reading and parsing file
         ``filename``.
 
@@ -131,9 +131,12 @@ class Configuration(MutableMapping):
             filename to parse config from
         :param ctx:
             mapping object used for value interpolation
+        :param constructors:
+            mapping of names to constructor for custom objects in YAML. Look at
+            `_timedelta_constructor` and `_re_constructor` for examples.
         """
         with open(filename, "r") as f:
-            cfg = cls(load(f.read()), ctx=ctx)
+            cfg = cls(load(f.read(), constructors), ctx=ctx)
         if "extends" in cfg:
             supcfg_path = path.join(path.dirname(filename), cfg.pop("extends"))
             supcfg = cls.from_file(supcfg_path)
@@ -141,15 +144,18 @@ class Configuration(MutableMapping):
         return cfg
 
     @classmethod
-    def from_string(cls, string, ctx=None):
+    def from_string(cls, string, ctx=None, constructors=None):
         """ Construct :class:`.Configuration` from ``string``.
 
         :param string:
             string to parse config from
         :param ctx:
             mapping object used for value interpolation
+        :param constructors:
+            mapping of names to constructor for custom objects in YAML. Look at
+            `_timedelta_constructor` and `_re_constructor` for examples.
         """
-        return cls(load(string), ctx=ctx)
+        return cls(load(string, constructors), ctx=ctx)
 
     @classmethod
     def from_dict(cls, d, ctx=None):
@@ -265,10 +271,13 @@ def _re_constructor(loader, node):
     item = loader.construct_scalar(node)
     return re_compile(item)
 
-def load(stream):
+def load(stream, constructors=None):
     loader = Loader(stream)
     loader.add_constructor("!timedelta", _timedelta_contructor)
     loader.add_constructor("!re", _re_constructor)
+    if constructors:
+        for name, constructor in constructors.items():
+            loader.add_constructor("!" + name, constructor)
     try:
         return loader.get_single_data()
     finally:
