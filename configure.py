@@ -192,21 +192,15 @@ def configure_logging(logcfg=None, disable_existing_loggers=True):
                 }
             }
     else:
-        logcfg = {
-            "handlers": {
-                "console": {
-                    "class": "logging.StreamHandler",
-                    "formatter": "precise",
-                    "level": "NOTSET",
-                }
-            }
-        }
+        logcfg = {}
 
     if not "version" in logcfg:
         logcfg["version"] = 1
 
     if not "disable_existing_loggers" in logcfg:
         logcfg["disable_existing_loggers"] = disable_existing_loggers
+
+    # formatters
 
     if not "formatters" in logcfg:
         logcfg["formatters"] = {}
@@ -221,24 +215,34 @@ def configure_logging(logcfg=None, disable_existing_loggers=True):
             "format": "%(asctime)s %(levelname)-8s %(name)-15s %(message)s",
         }
 
+    # handlers
+
     if not "root" in logcfg:
         logcfg["root"] = {
             "handlers": ["console"],
             "level": "NOTSET",
         }
 
-    if not "syslog" in logcfg.get("handlers", {}):
-        logcfg.setdefault("handlers", {})["syslog"] = {
-            "class": "logging.handlers.SysLogHandler"
+    if not "handlers" in logcfg:
+        logcfg["handlers"] = {}
+
+    if not "syslog" in logcfg["handlers"]:
+        logcfg["handlers"]["syslog"] = {
+            "class": "logging.handlers.SysLogHandler",
+            "formatter": "precise",
+            "level": "NOTSET",
         }
 
-    if not "console" in logcfg.get("handlers", {}):
-        logcfg.setdefault("handlers", {})["console"] = {
+    if not "console" in logcfg["handlers"]:
+        logcfg["handlers"]["console"] = {
             "class": "logging.StreamHandler",
+            "formatter": "precise",
             "level": "NOTSET",
         }
 
     from logging.config import dictConfig
+    from pprint import pprint
+    pprint(logcfg)
     dictConfig(logcfg)
 
 def _timedelta_contructor(loader, node):
