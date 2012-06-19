@@ -20,6 +20,9 @@
 
 """
 
+import sys
+from inspect import getargspec
+from types import FunctionType
 from re import compile as re_compile
 from os import path
 from collections import MutableMapping, Mapping
@@ -43,9 +46,17 @@ class Configuration(MutableMapping):
     Implements :class:`collections.MutableMapping` protocol.
     """
 
-    def __init__(self, struct=None, ctx=None):
+    def __init__(self, struct=None, ctx=None, parent=None):
         self.__struct = struct
         self.__ctx = ctx or {}
+        self._parent = parent
+
+    @property
+    def _root(self):
+        c = self
+        while c._parent is not None:
+            c = c._parent
+        return c
 
     # Iterable
     def __iter__(self):
@@ -71,7 +82,7 @@ class Configuration(MutableMapping):
             raise ConfigurationError("unconfigured")
         data = self.__struct[name]
         if isinstance(data, dict):
-            return self.__class__(data, self.__ctx)
+            return self.__class__(data, self.__ctx, parent=self)
         if isinstance(data, basestring):
             return data % self.__ctx
         return data
@@ -103,10 +114,30 @@ class Configuration(MutableMapping):
 
     def merge(self, config):
         """ Merge configuration into this one"""
-        new = self.__class__({})
+        new = self.__class__({}, parent=self._parent)
         new._merge(self)
         new._merge(config)
         return new
+
+    def by_ref(self, path, value=None):
+        if path[:2] == "..":
+            path = path[1:]
+            return self._parent.by_ref(path, value)
+
+        if path[:1] != ".":
+            return self._root.by_ref("." + path, value)
+
+        path = path[1:]
+        if "." in path:
+            n, path = path.split(".", 1)
+            n = self[n]
+            return n.by_ref(path, value)
+        else:
+            if value is None:
+                return self[path]
+            else:
+                self[path] = value
+                return value
 
     def __add__(self, config):
         return self.merge(config)
@@ -241,9 +272,57 @@ def configure_logging(logcfg=None, disable_existing_loggers=True):
         }
 
     from logging.config import dictConfig
-    from pprint import pprint
-    pprint(logcfg)
     dictConfig(logcfg)
+
+def configure_obj(config, factory=None, ctx=None):
+    config = dict(config)
+    factory = config.pop("factory", None) or factory
+    if not factory:
+        raise ConfigurationError("cannot configure object without factory")
+    if isinstance(factory, basestring):
+        try:
+            factory = import_string(factory)
+        except ImportStringError as e:
+            raise ConfigurationError("cannot import factory: %s" % e)
+    if isinstance(factory, FunctionType):
+        argspec = getargspec(factory)
+    elif isinstance(factory, type):
+        argspec = getargspec(factory.__init__)
+        argspec = argspec._replace(args=argspec.args[1:])
+
+    args = []
+    kwargs = {}
+
+    pos_cut = len(argspec.args) - len(argspec.defaults)
+
+    for a in argspec.args[:pos_cut]:
+        if not a in config:
+            raise ConfigurationError(
+                "missing '%s' argument for %s" % (a, factory))
+        arg = config.pop(a)
+        if isinstance(arg, Ref):
+            arg = arg(ctx)
+        args.append(arg)
+
+    for a in argspec.args[pos_cut:]:
+        if a in config:
+            arg = config.pop(a)
+            if isinstance(arg, Ref):
+                arg = arg(ctx)
+            kwargs[a] = arg
+
+    if config:
+        raise ConfigurationError(
+            "extra arguments '%s' found for %s" % (a, factory))
+    return factory(*args, **kwargs)
+
+def configure_obj_graph(config):
+    for k, v in config.iteritems():
+        if isinstance(v, Obj):
+            config[k] = v(config)
+        if isinstance(v, Mapping):
+            config[k] = configure_obj_graph(v)
+    return config
 
 def _timedelta_contructor(loader, node):
     item = loader.construct_scalar(node)
@@ -275,14 +354,140 @@ def _re_constructor(loader, node):
     item = loader.construct_scalar(node)
     return re_compile(item)
 
+class Ref(object):
+
+    def __init__(self, ref):
+        self.ref = ref
+
+    def __call__(self, ctx):
+        o = ctx.by_ref(self.ref)
+        if isinstance(o, Obj):
+            return ctx.by_ref(self.ref, o(ctx))
+        return o
+
+def _ref_constructor(loader, node):
+    item = loader.construct_scalar(node)
+    return Ref(item)
+
+class Obj(object):
+
+    def __init__(self, config):
+        self.config = config
+
+    def __call__(self, ctx):
+        return configure_obj(self.config, ctx=ctx)
+
+def _obj_constructor(loader, node):
+    item = loader.construct_mapping(node)
+    return Obj(item)
+
 def load(stream, constructors=None):
     loader = Loader(stream)
-    loader.add_constructor("!timedelta", _timedelta_contructor)
-    loader.add_constructor("!re", _re_constructor)
+    constructors = constructors or {}
+
+    if not "timedelta" in constructors:
+        loader.add_constructor("!timedelta", _timedelta_contructor)
+    if not "re" in constructors:
+        loader.add_constructor("!re", _re_constructor)
+    if not "ref" in constructors:
+        loader.add_constructor("!ref", _ref_constructor)
+    if not "obj" in constructors:
+        loader.add_constructor("!obj", _obj_constructor)
+
     if constructors:
         for name, constructor in constructors.items():
             loader.add_constructor("!" + name, constructor)
+
     try:
         return loader.get_single_data()
     finally:
         loader.dispose()
+
+def import_string(import_name, silent=False):
+    """Imports an object based on a string.  This is useful if you want to
+    use import paths as endpoints or something similar.  An import path can
+    be specified either in dotted notation (``xml.sax.saxutils.escape``)
+    or with a colon as object delimiter (``xml.sax.saxutils:escape``).
+
+    If `silent` is True the return value will be `None` if the import fails.
+
+    For better debugging we recommend the new :func:`import_module`
+    function to be used instead.
+
+    :param import_name: the dotted name for the object to import.
+    :param silent: if set to `True` import errors are ignored and
+                   `None` is returned instead.
+    :return: imported object
+
+    :copyright: (c) 2011 by the Werkzeug Team
+    """
+    # force the import name to automatically convert to strings
+    if isinstance(import_name, unicode):
+        import_name = str(import_name)
+    try:
+        if ':' in import_name:
+            module, obj = import_name.split(':', 1)
+        elif '.' in import_name:
+            module, obj = import_name.rsplit('.', 1)
+        else:
+            return __import__(import_name)
+        # __import__ is not able to handle unicode strings in the fromlist
+        # if the module is a package
+        if isinstance(obj, unicode):
+            obj = obj.encode('utf-8')
+        try:
+            return getattr(__import__(module, None, None, [obj]), obj)
+        except (ImportError, AttributeError):
+            # support importing modules not yet set up by the parent module
+            # (or package for that matter)
+            modname = module + '.' + obj
+            __import__(modname)
+            return sys.modules[modname]
+    except ImportError, e:
+        if not silent:
+            raise ImportStringError(import_name, e), None, sys.exc_info()[2]
+
+class ImportStringError(ImportError):
+    """Provides information about a failed :func:`import_string` attempt.
+
+    :copyright: (c) 2011 by the Werkzeug Team
+    """
+
+    #: String in dotted notation that failed to be imported.
+    import_name = None
+    #: Wrapped exception.
+    exception = None
+
+    def __init__(self, import_name, exception):
+        self.import_name = import_name
+        self.exception = exception
+
+        msg = (
+            'import_string() failed for %r. Possible reasons are:\n\n'
+            '- missing __init__.py in a package;\n'
+            '- package or module path not included in sys.path;\n'
+            '- duplicated package or module name taking precedence in '
+            'sys.path;\n'
+            '- missing module, class, function or variable;\n\n'
+            'Debugged import:\n\n%s\n\n'
+            'Original exception:\n\n%s: %s')
+
+        name = ''
+        tracked = []
+        for part in import_name.replace(':', '.').split('.'):
+            name += (name and '.') + part
+            imported = import_string(name, silent=True)
+            if imported:
+                tracked.append((name, imported.__file__))
+            else:
+                track = ['- %r found in %r.' % (n, i) for n, i in tracked]
+                track.append('- %r not found.' % name)
+                msg = msg % (import_name, '\n'.join(track),
+                             exception.__class__.__name__, str(exception))
+                break
+
+        ImportError.__init__(self, msg)
+
+    def __repr__(self):
+        return '<%s(%r, %r)>' % (self.__class__.__name__, self.import_name,
+                                 self.exception)
