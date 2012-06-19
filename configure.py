@@ -131,7 +131,10 @@ class Configuration(MutableMapping):
         if "." in path:
             n, path = path.split(".", 1)
             n = self[n]
-            return n.by_ref(path, value)
+            if isinstance(n, Configuration):
+                return n.by_ref("." + path, value)
+            else:
+                return obj_by_ref(n, path)
         else:
             if value is None:
                 return self[path]
@@ -494,3 +497,8 @@ class ImportStringError(ImportError):
     def __repr__(self):
         return '<%s(%r, %r)>' % (self.__class__.__name__, self.import_name,
                                  self.exception)
+
+def obj_by_ref(o, path):
+    for s in path.split("."):
+        o = getattr(o, s)
+    return o
