@@ -148,6 +148,9 @@ class Configuration(MutableMapping):
             struct = struct._Configuration__struct
         self.__struct = struct
 
+    def configure_obj_graph(self):
+        return configure_obj_graph(self)
+
     def __repr__(self):
         return repr(self.__struct)
 
@@ -293,7 +296,7 @@ def configure_obj(config, factory=None, ctx=None):
     args = []
     kwargs = {}
 
-    pos_cut = len(argspec.args) - len(argspec.defaults)
+    pos_cut = len(argspec.args) - len(argspec.defaults or [])
 
     for a in argspec.args[:pos_cut]:
         if not a in config:
@@ -313,7 +316,7 @@ def configure_obj(config, factory=None, ctx=None):
 
     if config:
         raise ConfigurationError(
-            "extra arguments '%s' found for %s" % (a, factory))
+            "extra arguments '%s' found for %s" % (config, factory))
     return factory(*args, **kwargs)
 
 def configure_obj_graph(config):
