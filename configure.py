@@ -306,14 +306,14 @@ def configure_obj(config, factory=None, ctx=None):
             raise ConfigurationError(
                 "missing '%s' argument for %s" % (a, factory))
         arg = config.pop(a)
-        if isinstance(arg, Ref):
+        if isinstance(arg, (Ref, Obj)):
             arg = arg(ctx)
         args.append(arg)
 
     for a in argspec.args[pos_cut:]:
         if a in config:
             arg = config.pop(a)
-            if isinstance(arg, Ref):
+            if isinstance(arg, (Ref, Obj)):
                 arg = arg(ctx)
             kwargs[a] = arg
 
