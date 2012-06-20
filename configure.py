@@ -32,7 +32,9 @@ try:
 except ImportError:
     from yaml import Loader
 
-__all__ = ("Configuration", "ConfigurationError", "configure_logging")
+__all__ = (
+    "Configuration", "ConfigurationError", "configure_logging",
+    "format_config", "print_config")
 
 class ConfigurationError(ValueError):
     """ Configuration error"""
@@ -204,6 +206,20 @@ class Configuration(MutableMapping):
             mapping object used for value interpolation
         """
         return cls(d, ctx=ctx)
+
+def format_config(config, _lvl=0):
+    indent = "  " * _lvl
+    buf = ""
+    for k, v in config.items():
+        buf += "%s%s:\n" % (indent, k)
+        if isinstance(v, Configuration):
+            buf += format_config(v, _lvl + 1)
+        else:
+            buf += "%s%s\n" % ("  " * (_lvl + 1), v)
+    return buf
+
+def print_config(config):
+    print format_config(config)
 
 def configure_logging(logcfg=None, disable_existing_loggers=True):
     """ Configure logging in a sane way
