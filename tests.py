@@ -1,7 +1,7 @@
 """ Tests for configure"""
 
 from unittest import TestCase as BaseTestCase
-from configure import Configuration, Ref, configure_obj, configure_obj_graph
+from configure import Configuration, Ref, Obj
 
 class A(object):
 
@@ -29,9 +29,9 @@ b: "%(b)s"
         c = self.config("""
 a: 1
 b:
-    c: !ref a
-    d: !ref ..a
-e: !ref .b
+    c: !ref:a
+    d: !ref:..a
+e: !ref:.b
         """)
         self.assertEqual(c.a, 1)
         self.assertEqual(c.e(c), c.b)
@@ -51,22 +51,22 @@ a4:
     a: 4
     b: 5
         """)
-        o = configure_obj(A, c.a1)
+        o = Obj(A, c.a1)(c)
         self.assertTrue(isinstance(o, A))
         self.assertEqual(o.a, 1)
         self.assertEqual(o.b, 3)
 
-        o = configure_obj(A, c.a2)
+        o = Obj(A, c.a2)(c)
         self.assertTrue(isinstance(o, A))
         self.assertEqual(o.a, 2)
         self.assertEqual(o.b, 4)
 
-        o = configure_obj(a, c.a3)
+        o = Obj(a, c.a3)(c)
         self.assertTrue(isinstance(o, A))
         self.assertEqual(o.a, 3)
         self.assertEqual(o.b, 4)
 
-        o = configure_obj(a, c.a4)
+        o = Obj(a, c.a4)(c)
         self.assertTrue(isinstance(o, A))
         self.assertEqual(o.a, 4)
         self.assertEqual(o.b, 5)
@@ -75,11 +75,11 @@ a4:
         c = self.config("""
 a: !obj:tests.A
     a: 1
-    b: !ref .b
+    b: !ref:.b
 b: !obj:tests.a
     a: 3
         """)
-        c = configure_obj_graph(c)
+        c.configure()
         self.assertTrue(isinstance(c.a, A))
         self.assertEqual(c.a.a, 1)
         self.assertTrue(isinstance(c.b, A))

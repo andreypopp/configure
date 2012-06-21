@@ -48,10 +48,13 @@ class Configuration(MutableMapping):
     Implements :class:`collections.MutableMapping` protocol.
     """
 
-    def __init__(self, struct=None, ctx=None, parent=None):
+    def __init__(self, struct=None, ctx=None, pwd=None, parent=None):
+        self._pwd = pwd or "."
+        self._parent = parent
         self.__struct = struct
         self.__ctx = ctx or {}
-        self._parent = parent
+
+        self.__ctx["pwd"] = self._pwd
 
     @property
     def _root(self):
@@ -84,7 +87,7 @@ class Configuration(MutableMapping):
             raise ConfigurationError("unconfigured")
         data = self.__struct[name]
         if isinstance(data, dict):
-            return self.__class__(data, self.__ctx, parent=self)
+            return self.__class__(data, self.__ctx, parent=self, pwd=self._pwd)
         if isinstance(data, basestring):
             return data % self.__ctx
         return data
@@ -116,7 +119,7 @@ class Configuration(MutableMapping):
 
     def merge(self, config):
         """ Merge configuration into this one"""
-        new = self.__class__({}, parent=self._parent)
+        new = self.__class__({}, parent=self._parent, pwd=self._pwd)
         new._merge(self)
         new._merge(config)
         return new
@@ -147,14 +150,31 @@ class Configuration(MutableMapping):
     def __add__(self, config):
         return self.merge(config)
 
-    def configure(self, struct):
+    def configure(self, struct=None, _root=True):
         """ Configure with other configuration object"""
-        if isinstance(struct, self.__class__):
-            struct = struct._Configuration__struct
-        self.__struct = struct
+        if struct is not None:
+            if isinstance(struct, self.__class__):
+                struct = struct._Configuration__struct
+            self.__struct = struct
 
-    def configure_obj_graph(self):
-        return configure_obj_graph(self)
+        def _impl(v):
+            if isinstance(v, Obj):
+                return v(self)
+            if isinstance(v, Include):
+                return v(self)
+            if isinstance(v, Extends):
+                return v(self)
+            if isinstance(v, Configuration):
+                return v.configure()
+            return v
+
+        if _root:
+            if isinstance(self.__struct, Extends):
+                self.__struct = self.__struct(
+                    Configuration.from_dict({}, ctx=self.__ctx, pwd=self._pwd))
+
+        for k, v in self.iteritems():
+            self[k] = _impl(v)
 
     def __repr__(self):
         return repr(self.__struct)
@@ -204,16 +224,7 @@ class Configuration(MutableMapping):
         :param ctx:
             mapping object used for value interpolation
         """
-        ctx = ctx or {}
-        ctx["pwd"] = pwd if pwd else "."
-        cfg = cls(cfg, ctx=ctx)
-        if "__extends__" in cfg:
-            supcfg_path = cfg.pop("__extends__")
-            if pwd:
-                supcfg_path = path.join(pwd, supcfg_path)
-            supcfg = cls.from_file(supcfg_path)
-            cfg = supcfg + cfg
-        return cfg
+        return cls(cfg, ctx=ctx, pwd=pwd)
 
 def format_config(config, _lvl=0):
     indent = "  " * _lvl
@@ -304,53 +315,6 @@ def configure_logging(logcfg=None, disable_existing_loggers=True):
     from logging.config import dictConfig
     dictConfig(logcfg)
 
-def configure_obj(factory, config, ctx=None):
-    config = dict(config)
-    if isinstance(factory, basestring):
-        try:
-            factory = import_string(factory)
-        except ImportStringError as e:
-            raise ConfigurationError("cannot import factory: %s" % e)
-    if isinstance(factory, FunctionType):
-        argspec = getargspec(factory)
-    elif isinstance(factory, type):
-        argspec = getargspec(factory.__init__)
-        argspec = argspec._replace(args=argspec.args[1:])
-
-    args = []
-    kwargs = {}
-
-    pos_cut = len(argspec.args) - len(argspec.defaults or [])
-
-    for a in argspec.args[:pos_cut]:
-        if not a in config:
-            raise ConfigurationError(
-                "missing '%s' argument for %s" % (a, factory))
-        arg = config.pop(a)
-        if isinstance(arg, (Ref, Obj)):
-            arg = arg(ctx)
-        args.append(arg)
-
-    for a in argspec.args[pos_cut:]:
-        if a in config:
-            arg = config.pop(a)
-            if isinstance(arg, (Ref, Obj)):
-                arg = arg(ctx)
-            kwargs[a] = arg
-
-    if config:
-        raise ConfigurationError(
-            "extra arguments '%s' found for %s" % (config, factory))
-    return factory(*args, **kwargs)
-
-def configure_obj_graph(config):
-    for k, v in config.iteritems():
-        if isinstance(v, Obj):
-            config[k] = v(config)
-        if isinstance(v, Mapping):
-            config[k] = configure_obj_graph(v)
-    return config
-
 def _timedelta_contructor(loader, node):
     item = loader.construct_scalar(node)
 
@@ -392,9 +356,8 @@ class Ref(object):
             return ctx.by_ref(self.ref, o(ctx))
         return o
 
-def _ref_constructor(loader, node):
-    item = loader.construct_scalar(node)
-    return Ref(item)
+def _ref_constructor(loader, tag, node):
+    return Ref(tag)
 
 class Obj(object):
 
@@ -403,16 +366,74 @@ class Obj(object):
         self.config = config
 
     def __call__(self, ctx):
-        return configure_obj(self.factory, self.config, ctx=ctx)
+        config = dict(self.config)
+        factory = self.factory
+        if isinstance(factory, basestring):
+            try:
+                factory = import_string(factory)
+            except ImportStringError as e:
+                raise ConfigurationError("cannot import factory: %s" % e)
+        if isinstance(factory, FunctionType):
+            argspec = getargspec(factory)
+        elif isinstance(factory, type):
+            argspec = getargspec(factory.__init__)
+            argspec = argspec._replace(args=argspec.args[1:])
+
+        args = []
+        kwargs = {}
+
+        pos_cut = len(argspec.args) - len(argspec.defaults or [])
+
+        for a in argspec.args[:pos_cut]:
+            if not a in config:
+                raise ConfigurationError(
+                    "missing '%s' argument for %s" % (a, factory))
+            arg = config.pop(a)
+            if isinstance(arg, (Ref, Obj)):
+                arg = arg(ctx)
+            args.append(arg)
+
+        for a in argspec.args[pos_cut:]:
+            if a in config:
+                arg = config.pop(a)
+                if isinstance(arg, (Ref, Obj)):
+                    arg = arg(ctx)
+                kwargs[a] = arg
+
+        if config:
+            raise ConfigurationError(
+                "extra arguments '%s' found for %s" % (config, factory))
+        return factory(*args, **kwargs)
 
 def _obj_constructor(loader, tag, node):
     item = loader.construct_mapping(node)
     return Obj(tag, item)
 
+class Include(object):
+
+    def __init__(self, filename):
+        self.filename = filename
+
+    def __call__(self, ctx):
+        return Configuration.from_file(path.join(ctx._pwd, self.filename))
+
+def _include_constructor(loader, tag, node):
+    return Include(tag)
+
+class Extends(object):
+
+    def __init__(self, filename, config):
+        self.filename = filename
+        self.config = config
+
+    def __call__(self, ctx):
+        sup = Configuration.from_file(path.join(ctx._pwd, self.filename))
+        cfg = Configuration.from_dict(self.config)
+        return sup + cfg
+
 def _extends_constructor(loader, tag, node):
     item = loader.construct_mapping(node)
-    item["__extends__"] = tag
-    return item
+    return Extends(tag, item)
 
 def load(stream, constructors=None):
     loader = Loader(stream)
@@ -422,12 +443,11 @@ def load(stream, constructors=None):
         loader.add_constructor("!timedelta", _timedelta_contructor)
     if not "re" in constructors:
         loader.add_constructor("!re", _re_constructor)
-    if not "ref" in constructors:
-        loader.add_constructor("!ref", _ref_constructor)
-    if not "obj" in constructors:
-        loader.add_multi_constructor("!obj:", _obj_constructor)
-    if not "extends" in constructors:
-        loader.add_multi_constructor("!extends:", _extends_constructor)
+
+    loader.add_multi_constructor("!ref:", _ref_constructor)
+    loader.add_multi_constructor("!obj:", _obj_constructor)
+    loader.add_multi_constructor("!extends:", _extends_constructor)
+    loader.add_multi_constructor("!include:", _extends_constructor)
 
     if constructors:
         for name, constructor in constructors.items():
