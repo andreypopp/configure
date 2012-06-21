@@ -71,7 +71,7 @@ a4:
         self.assertEqual(o.a, 4)
         self.assertEqual(o.b, 5)
 
-    def test_obj_graph(self):
+    def test_graph(self):
         c = self.config("""
 a: !factory:tests.A
     a: 1
@@ -88,3 +88,12 @@ b: !factory:tests.a
         self.assertEqual(c.a.b.a, c.b.a)
         self.assertEqual(c.a.b.b, c.b.b)
         self.assertTrue(c.a.b is c.b)
+
+    def test_obj(self):
+        c = self.config("""
+a: !obj:tests.A
+b: !obj:tests.a
+        """)
+        c.configure()
+        self.assertTrue(c.a is A)
+        self.assertTrue(c.b is a)

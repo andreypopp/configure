@@ -158,11 +158,7 @@ class Configuration(MutableMapping):
             self.__struct = struct
 
         def _impl(v):
-            if isinstance(v, Factory):
-                return v(self)
-            if isinstance(v, Include):
-                return v(self)
-            if isinstance(v, Extends):
+            if isinstance(v, (Factory, Obj, Include, Extends)):
                 return v(self)
             if isinstance(v, Configuration):
                 return v.configure()
@@ -409,6 +405,20 @@ def _factory_constructor(loader, tag, node):
     item = loader.construct_mapping(node)
     return Factory(tag, item)
 
+class Obj(object):
+
+    def __init__(self, obj):
+        self.obj = obj
+
+    def __call__(self, ctx):
+        try:
+            return import_string(self.obj)
+        except ImportStringError as e:
+            raise ConfigurationError("cannot import obj: %s" % e)
+
+def _obj_constructor(loader, tag, node):
+    return Obj(tag)
+
 class Include(object):
 
     def __init__(self, filename):
@@ -446,6 +456,7 @@ def load(stream, constructors=None):
 
     loader.add_multi_constructor("!ref:", _ref_constructor)
     loader.add_multi_constructor("!factory:", _factory_constructor)
+    loader.add_multi_constructor("!obj:", _obj_constructor)
     loader.add_multi_constructor("!extends:", _extends_constructor)
     loader.add_multi_constructor("!include:", _extends_constructor)
 
