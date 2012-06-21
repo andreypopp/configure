@@ -1,6 +1,6 @@
 """ Tests for configure"""
 
-from unittest import TestCase as BaseTestCase
+from unittest import TestCase as BaseTestCase, main
 from configure import Configuration, Ref, configure_obj, configure_obj_graph
 
 class A(object):
@@ -94,3 +94,7 @@ b: !obj
         self.assertEqual(c.a.b.a, c.b.a)
         self.assertEqual(c.a.b.b, c.b.b)
         self.assertTrue(c.a.b is c.b)
+
+
+if __name__ == '__main__':
+    main()
