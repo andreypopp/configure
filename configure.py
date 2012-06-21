@@ -21,14 +21,14 @@
 """
 
 import sys
+from os import path
 from inspect import getargspec
 from types import FunctionType
 from re import compile as re_compile
-from os import path
 from collections import MutableMapping, Mapping
 from datetime import timedelta
 try:
-    from yaml import CLoader as Loader
+    from yaml import Loader as Loader
 except ImportError:
     from yaml import Loader
 
@@ -162,7 +162,7 @@ class Configuration(MutableMapping):
     __str__ = __repr__
 
     @classmethod
-    def from_file(cls, filename, ctx=None, constructors=None):
+    def from_file(cls, filename, ctx=None, pwd=None, constructors=None):
         """ Construct :class:`.Configuration` object by reading and parsing file
         ``filename``.
 
@@ -174,16 +174,14 @@ class Configuration(MutableMapping):
             mapping of names to constructor for custom objects in YAML. Look at
             `_timedelta_constructor` and `_re_constructor` for examples.
         """
+        if pwd is None:
+            pwd = path.dirname(filename)
         with open(filename, "r") as f:
-            cfg = cls(load(f.read(), constructors), ctx=ctx)
-        if "extends" in cfg:
-            supcfg_path = path.join(path.dirname(filename), cfg.pop("extends"))
-            supcfg = cls.from_file(supcfg_path)
-            cfg = supcfg + cfg
-        return cfg
+            return cls.from_string(f.read(), ctx=ctx, pwd=pwd,
+                    constructors=constructors)
 
     @classmethod
-    def from_string(cls, string, ctx=None, constructors=None):
+    def from_string(cls, string, ctx=None, pwd=None, constructors=None):
         """ Construct :class:`.Configuration` from ``string``.
 
         :param string:
@@ -194,10 +192,11 @@ class Configuration(MutableMapping):
             mapping of names to constructor for custom objects in YAML. Look at
             `_timedelta_constructor` and `_re_constructor` for examples.
         """
-        return cls(load(string, constructors), ctx=ctx)
+        cfg = load(string, constructors=constructors)
+        return cls.from_dict(cfg, ctx=ctx, pwd=pwd)
 
     @classmethod
-    def from_dict(cls, d, ctx=None):
+    def from_dict(cls, cfg, ctx=None, pwd=None):
         """ Construct :class:`.Configuration` from dict ``d``.
 
         :param d:
@@ -205,7 +204,14 @@ class Configuration(MutableMapping):
         :param ctx:
             mapping object used for value interpolation
         """
-        return cls(d, ctx=ctx)
+        cfg = cls(cfg, ctx=ctx)
+        if "__extends__" in cfg:
+            supcfg_path = cfg.pop("__extends__")
+            if pwd:
+                supcfg_path = path.join(pwd, supcfg_path)
+            supcfg = cls.from_file(supcfg_path)
+            cfg = supcfg + cfg
+        return cfg
 
 def format_config(config, _lvl=0):
     indent = "  " * _lvl
@@ -296,11 +302,8 @@ def configure_logging(logcfg=None, disable_existing_loggers=True):
     from logging.config import dictConfig
     dictConfig(logcfg)
 
-def configure_obj(config, factory=None, ctx=None):
+def configure_obj(factory, config, ctx=None):
     config = dict(config)
-    factory = config.pop("factory", None) or factory
-    if not factory:
-        raise ConfigurationError("cannot configure object without factory")
     if isinstance(factory, basestring):
         try:
             factory = import_string(factory)
@@ -393,15 +396,21 @@ def _ref_constructor(loader, node):
 
 class Obj(object):
 
-    def __init__(self, config):
+    def __init__(self, factory, config):
+        self.factory = factory
         self.config = config
 
     def __call__(self, ctx):
-        return configure_obj(self.config, ctx=ctx)
+        return configure_obj(self.factory, self.config, ctx=ctx)
 
-def _obj_constructor(loader, node):
+def _obj_constructor(loader, tag, node):
     item = loader.construct_mapping(node)
-    return Obj(item)
+    return Obj(tag, item)
+
+def _extends_constructor(loader, tag, node):
+    item = loader.construct_mapping(node)
+    item["__extends__"] = tag
+    return item
 
 def load(stream, constructors=None):
     loader = Loader(stream)
@@ -414,7 +423,9 @@ def load(stream, constructors=None):
     if not "ref" in constructors:
         loader.add_constructor("!ref", _ref_constructor)
     if not "obj" in constructors:
-        loader.add_constructor("!obj", _obj_constructor)
+        loader.add_multi_constructor("!obj:", _obj_constructor)
+    if not "extends" in constructors:
+        loader.add_multi_constructor("!extends:", _extends_constructor)
 
     if constructors:
         for name, constructor in constructors.items():

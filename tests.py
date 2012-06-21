@@ -41,48 +41,42 @@ e: !ref .b
     def test_obj(self):
         c = self.config("""
 a1:
-    factory: tests.A
     a: 1
 a2:
-    factory: tests.A
     a: 2
     b: 4
 a3:
-    factory: tests.a
     a: 3
 a4:
-    factory: tests.a
     a: 4
     b: 5
         """)
-        o = configure_obj(c.a1)
+        o = configure_obj(A, c.a1)
         self.assertTrue(isinstance(o, A))
         self.assertEqual(o.a, 1)
         self.assertEqual(o.b, 3)
 
-        o = configure_obj(c.a2)
+        o = configure_obj(A, c.a2)
         self.assertTrue(isinstance(o, A))
         self.assertEqual(o.a, 2)
         self.assertEqual(o.b, 4)
 
-        o = configure_obj(c.a3)
+        o = configure_obj(a, c.a3)
         self.assertTrue(isinstance(o, A))
         self.assertEqual(o.a, 3)
         self.assertEqual(o.b, 4)
 
-        o = configure_obj(c.a4)
+        o = configure_obj(a, c.a4)
         self.assertTrue(isinstance(o, A))
         self.assertEqual(o.a, 4)
         self.assertEqual(o.b, 5)
 
     def test_obj_graph(self):
         c = self.config("""
-a: !obj
-    factory: tests.A
+a: !obj:tests.A
     a: 1
     b: !ref .b
-b: !obj
-    factory: tests.a
+b: !obj:tests.a
     a: 3
         """)
         c = configure_obj_graph(c)
