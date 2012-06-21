@@ -1,7 +1,7 @@
 """ Tests for configure"""
 
 from unittest import TestCase as BaseTestCase
-from configure import Configuration, Ref, Obj
+from configure import Configuration, Ref, Factory
 
 class A(object):
 
@@ -38,7 +38,7 @@ e: !ref:.b
         self.assertEqual(c.b.c(c.b), c.a)
         self.assertEqual(c.b.d(c.b), c.a)
 
-    def test_obj(self):
+    def test_factory(self):
         c = self.config("""
 a1:
     a: 1
@@ -51,32 +51,32 @@ a4:
     a: 4
     b: 5
         """)
-        o = Obj(A, c.a1)(c)
+        o = Factory(A, c.a1)(c)
         self.assertTrue(isinstance(o, A))
         self.assertEqual(o.a, 1)
         self.assertEqual(o.b, 3)
 
-        o = Obj(A, c.a2)(c)
+        o = Factory(A, c.a2)(c)
         self.assertTrue(isinstance(o, A))
         self.assertEqual(o.a, 2)
         self.assertEqual(o.b, 4)
 
-        o = Obj(a, c.a3)(c)
+        o = Factory(a, c.a3)(c)
         self.assertTrue(isinstance(o, A))
         self.assertEqual(o.a, 3)
         self.assertEqual(o.b, 4)
 
-        o = Obj(a, c.a4)(c)
+        o = Factory(a, c.a4)(c)
         self.assertTrue(isinstance(o, A))
         self.assertEqual(o.a, 4)
         self.assertEqual(o.b, 5)
 
     def test_obj_graph(self):
         c = self.config("""
-a: !obj:tests.A
+a: !factory:tests.A
     a: 1
     b: !ref:.b
-b: !obj:tests.a
+b: !factory:tests.a
     a: 3
         """)
         c.configure()

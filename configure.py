@@ -158,7 +158,7 @@ class Configuration(MutableMapping):
             self.__struct = struct
 
         def _impl(v):
-            if isinstance(v, Obj):
+            if isinstance(v, Factory):
                 return v(self)
             if isinstance(v, Include):
                 return v(self)
@@ -352,14 +352,14 @@ class Ref(object):
 
     def __call__(self, ctx):
         o = ctx.by_ref(self.ref)
-        if isinstance(o, Obj):
+        if isinstance(o, Factory):
             return ctx.by_ref(self.ref, o(ctx))
         return o
 
 def _ref_constructor(loader, tag, node):
     return Ref(tag)
 
-class Obj(object):
+class Factory(object):
 
     def __init__(self, factory, config):
         self.factory = factory
@@ -389,14 +389,14 @@ class Obj(object):
                 raise ConfigurationError(
                     "missing '%s' argument for %s" % (a, factory))
             arg = config.pop(a)
-            if isinstance(arg, (Ref, Obj)):
+            if isinstance(arg, (Ref, Factory)):
                 arg = arg(ctx)
             args.append(arg)
 
         for a in argspec.args[pos_cut:]:
             if a in config:
                 arg = config.pop(a)
-                if isinstance(arg, (Ref, Obj)):
+                if isinstance(arg, (Ref, Factory)):
                     arg = arg(ctx)
                 kwargs[a] = arg
 
@@ -405,9 +405,9 @@ class Obj(object):
                 "extra arguments '%s' found for %s" % (config, factory))
         return factory(*args, **kwargs)
 
-def _obj_constructor(loader, tag, node):
+def _factory_constructor(loader, tag, node):
     item = loader.construct_mapping(node)
-    return Obj(tag, item)
+    return Factory(tag, item)
 
 class Include(object):
 
@@ -445,7 +445,7 @@ def load(stream, constructors=None):
         loader.add_constructor("!re", _re_constructor)
 
     loader.add_multi_constructor("!ref:", _ref_constructor)
-    loader.add_multi_constructor("!obj:", _obj_constructor)
+    loader.add_multi_constructor("!factory:", _factory_constructor)
     loader.add_multi_constructor("!extends:", _extends_constructor)
     loader.add_multi_constructor("!include:", _extends_constructor)
 
