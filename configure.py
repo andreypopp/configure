@@ -204,6 +204,8 @@ class Configuration(MutableMapping):
         :param ctx:
             mapping object used for value interpolation
         """
+        ctx = ctx or {}
+        ctx["pwd"] = pwd if pwd else "."
         cfg = cls(cfg, ctx=ctx)
         if "__extends__" in cfg:
             supcfg_path = cfg.pop("__extends__")
