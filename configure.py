@@ -230,69 +230,47 @@ def configure_logging(logcfg=None, disable_existing_loggers=True):
     :param disable_existing_loggers:
         if we need to disable existing loggers
     """
-    if logcfg is not None:
-        if logcfg == "syslog":
-            logcfg = {
-                "handlers": {
-                    "syslog": {
-                        "class": "logging.handlers.SysLogHandler",
-                        "formatter": "precise",
-                    }
-                },
-                "root": {
-                    "handlers": ["syslog"],
-                    "level": "NOTSET",
+    logcfg = logcfg or {}
+    if logcfg == "syslog":
+        logcfg = {
+            "handlers": {
+                "syslog": {
+                    "class": "logging.handlers.SysLogHandler",
+                    "formatter": "precise",
                 }
+            },
+            "root": {
+                "handlers": ["syslog"],
+                "level": "NOTSET",
             }
-    else:
-        logcfg = {}
+        }
 
-    if not "version" in logcfg:
-        logcfg["version"] = 1
-
-    if not "disable_existing_loggers" in logcfg:
-        logcfg["disable_existing_loggers"] = disable_existing_loggers
+    logcfg.setdefault('version', 1)
+    logcfg.setdefault('disable_existing_loggers', disable_existing_loggers)
 
     # formatters
-
-    if not "formatters" in logcfg:
-        logcfg["formatters"] = {}
-
-    if not "brief" in logcfg["formatters"]:
-        logcfg["formatters"]["brief"] = {
-            "format": "%(message)s",
-        }
-
-    if not "precise" in logcfg["formatters"]:
-        logcfg["formatters"]["precise"] = {
-            "format": "%(asctime)s %(levelname)-8s %(name)-15s %(message)s",
-        }
+    logcfg.setdefault('formatters', {})
+    logcfg['formatters'].setdefault('brief', {'format': '%(message)s'})
+    logcfg['formatters'].setdefault('precise', {
+        'format': '%(asctime)s %(levelname)-8s %(name)-15s %(message)s'
+    })
 
     # handlers
-
-    if not "root" in logcfg:
-        logcfg["root"] = {
-            "handlers": ["console"],
-            "level": "NOTSET",
-        }
-
-    if not "handlers" in logcfg:
-        logcfg["handlers"] = {}
-
-    if not "syslog" in logcfg["handlers"]:
-        logcfg["handlers"]["syslog"] = {
-            "class": "logging.handlers.SysLogHandler",
-            "formatter": "precise",
-            "level": "NOTSET",
-        }
-
-    if not "console" in logcfg["handlers"]:
-        logcfg["handlers"]["console"] = {
-            "class": "logging.StreamHandler",
-            "formatter": "precise",
-            "level": "NOTSET",
-        }
-
+    logcfg.setdefault('handlers', {})
+    logcfg.setdefault('root', {
+        'handlers': ['console'],
+        'level': 'NOTSET',
+    })
+    logcfg['handlers'].setdefault('syslog', {
+        'class': 'logging.handlers.SysLogHandler',
+        'formatter': 'precise',
+        'level': 'NOTSET',
+    })
+    logcfg['handlers'].setdefault('console', {
+        'class': 'logging.StreamHandler',
+        'formatter': 'precise',
+        'level': 'NOTSET',
+    })
     from logging.config import dictConfig
     dictConfig(logcfg)
 
