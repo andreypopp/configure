@@ -1,0 +1,1 @@
+sphinxtheme-simple == 0.1
