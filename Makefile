@@ -3,3 +3,6 @@ test install build develop:
 
 upload:
 	python setup.py sdist upload
+
+docs::
+	$(MAKE) -C ./docs html
