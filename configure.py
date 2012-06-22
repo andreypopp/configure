@@ -34,7 +34,7 @@ except ImportError:
 
 __all__ = (
     "Configuration", "ConfigurationError", "configure_logging",
-    "format_config", "print_config")
+    "format_config", "print_config", "import_string", "ImportStringError")
 
 class ConfigurationError(ValueError):
     """ Configuration error"""
