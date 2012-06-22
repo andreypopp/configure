@@ -229,7 +229,7 @@ class Configuration(MutableMapping):
 def format_config(config, _lvl=0):
     indent = "  " * _lvl
     buf = ""
-    for k, v in config.items():
+    for k, v in sorted(config.items()):
         buf += "%s%s:\n" % (indent, k)
         if isinstance(v, Configuration):
             buf += format_config(v, _lvl + 1)
@@ -454,6 +454,18 @@ class Extends(object):
         sup = Configuration.from_file(path.join(ctx._pwd, self.filename))
         cfg = Configuration.from_dict(self.config)
         return sup + cfg
+
+    def __iter__(self):
+        return iter(self.config)
+
+    def __getitem__(self, name):
+        return self.config[name]
+
+    def __getattr__(self, name):
+        return getattr(self.config, name)
+
+    def __contains__(self, name):
+        return name in self.config
 
 def _extends_constructor(loader, tag, node):
     item = loader.construct_mapping(node)
