@@ -97,6 +97,8 @@ class Configuration(MutableMapping):
         if self.__struct is None:
             raise ConfigurationError("unconfigured")
         self.__struct[name] = value
+        if isinstance(value, Configuration):
+            value._parent = self
 
     # MutableMapping
     def __delitem__(self, name):
@@ -158,10 +160,10 @@ class Configuration(MutableMapping):
             self.__struct = struct
 
         def _impl(v):
-            if isinstance(v, (Factory, Obj, Include, Extends)):
+            if isinstance(v, (Factory, Obj, Ref, Include, Extends)):
                 return v(self)
             if isinstance(v, Configuration):
-                return v.configure()
+                return v.configure(_root=False)
             return v
 
         if _root:
@@ -171,6 +173,8 @@ class Configuration(MutableMapping):
 
         for k, v in self.iteritems():
             self[k] = _impl(v)
+
+        return self
 
     def __repr__(self):
         return repr(self.__struct)
@@ -352,6 +356,11 @@ class Ref(object):
             return ctx.by_ref(self.ref, o(ctx))
         return o
 
+    def __str__(self):
+        return '%s(%s)' % (self.__class__.__name__, self.ref)
+
+    __repr__ = __str__
+
 def _ref_constructor(loader, tag, node):
     return Ref(tag)
 
@@ -400,6 +409,11 @@ class Factory(object):
             raise ConfigurationError(
                 "extra arguments '%s' found for %s" % (config, factory))
         return factory(*args, **kwargs)
+
+    def __str__(self):
+        return '%s(%s)' % (self.__class__.__name__, self.factory)
+
+    __repr__ = __str__
 
 def _factory_constructor(loader, tag, node):
     item = loader.construct_mapping(node)
