@@ -3,19 +3,19 @@
    You can adapt this file completely to your liking, but it should at least
    contain the root `toctree` directive.
 
-Configure
-=========
+configure -- configuration toolkit for YAML
+===========================================
 
 Configure is a thin wrapper around PyYAML which extends already readable and
-powerful YAML with inheritance, composition and so called object-graph
-configuration features.
+powerful YAML with inheritance, composition and (so called) "object-graph
+configuration" features.
 
 Basic usage
 -----------
 
 Configure uses YAML as a configuration format so you can refer to `YAML
-specification`_ for details of how you can compose your configuration. The
-basics are the following -- you compose your config as a mapping, which allows
+specification`_ for details on how you can compose your configuration. The
+basics are the following -- you  your config as a mapping, which allows
 nesting and also can contain sequences::
 
     # my.conf
@@ -37,9 +37,10 @@ Inline comments are started with ``#`` (sharp). To read configuration::
     assert config.timeout == datetime.timedelta(seconds=600)
 
 As you can see ``timeout`` value automatically parsed and converted to
-``datetime.timedelta`` object by annotating configuration value with
+class:`datetime.timedelta` object by annotating configuration value with
 ``!timedelta`` tag. There's also ``!re`` builtin tag which passes value to
-``re.compile()`` function.
+``re.compile()`` function so you can have compiled regular expression right
+after reading a config.
 
 .. note::
    You should always call :meth:`Configuration.configure` method before using
@@ -54,7 +55,8 @@ Composition
 -----------
 
 You can compose configuration from different sources by using ``!include`` tag,
-the configuration you included will be inplace of the element you tagged::
+the configuration you included will be placed inplace of the element you
+tagged with ``!include``::
 
     # common.conf
     db: postgresql://localhost/dbname
@@ -78,7 +80,7 @@ Configuration can be also composed using inheritance mechanism using
 ``!extends`` tag. It can be useful for providing some sensible defaults for
 configuration file::
 
-    # base.conf
+    # base.conf, contains default values
     db: postgresql://localhost/dbname
 
     # app.conf
@@ -125,6 +127,11 @@ some other value from configuration which allows you to stay DRY, while
 .. note::
    This does work only with positional and keyword arguments and doesn't work
    with "magic" ``*args`` and ``**kwargs`` at the moment.
+
+.. note::
+   When using inheritance with ``!extends`` it is possible to ``!ref`` to refer
+   to values defined not in the current config but in the parent configs as
+   well.
 
 Another useful tag is the ``!obj`` tag which just imports some python object for
 you::
