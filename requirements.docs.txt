@@ -1,1 +1,1 @@
-sphinxtheme-simple == 0.1
+-e git://github.com/andreypopp/sphinxtheme-simple.git#egg=sphinxtheme-simple
