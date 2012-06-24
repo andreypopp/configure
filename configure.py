@@ -1,23 +1,4 @@
-"""
-
-    configure -- configuration toolkit
-    ==================================
-
-    This module provides wrapper around PyYAML with the following features:
-
-        * intepolation for string values
-
-        * configuration merging
-
-        * configuration inheritance (via 'extends' top-level attribute)
-
-    Basic usage is:
-
-        >>> from configure import Configuration
-        >>> c = Configuration.from_file("./example.conf")
-        >>> c.settings["a"]
-        2
-
+""" This module provides API to access YAML formatted configuration.
 """
 
 import sys
@@ -34,18 +15,17 @@ except ImportError:
 
 __all__ = (
     "Configuration", "ConfigurationError", "configure_logging",
-    "format_config", "print_config")
+    "format_config", "print_config", "import_string", "ImportStringError")
 
 class ConfigurationError(ValueError):
     """ Configuration error"""
 
 class Configuration(MutableMapping):
-    """ Configuration
+    """ Configuration object
 
     You should never instantiate this object but use ``from_file``,
-    ``from_string`` or ``from_dict`` classmethods instead.
-
-    Implements :class:`collections.MutableMapping` protocol.
+    ``from_string`` or ``from_dict`` classmethods instead. Implements
+    :class:`collections.MutableMapping` protocol.
     """
 
     def __init__(self, struct=None, ctx=None, pwd=None, parent=None):
@@ -55,6 +35,14 @@ class Configuration(MutableMapping):
         self.__ctx = ctx or {}
 
         self.__ctx["pwd"] = self._pwd
+
+    def merge(self, config):
+        """ Produce new configuration by merging ``config`` object into this
+        one"""
+        new = self.__class__({}, parent=self._parent, pwd=self._pwd)
+        new._merge(self)
+        new._merge(config)
+        return new
 
     @property
     def _root(self):
@@ -119,13 +107,6 @@ class Configuration(MutableMapping):
             else:
                 self[k] = v
 
-    def merge(self, config):
-        """ Merge configuration into this one"""
-        new = self.__class__({}, parent=self._parent, pwd=self._pwd)
-        new._merge(self)
-        new._merge(config)
-        return new
-
     def by_ref(self, path, value=None):
         if path[:2] == "..":
             path = path[1:]
@@ -153,7 +134,12 @@ class Configuration(MutableMapping):
         return self.merge(config)
 
     def configure(self, struct=None, _root=True):
-        """ Configure with other configuration object"""
+        """ Commit configuration
+
+        This method performs all actions pending to this ``Configuration``
+        object. You can also override configuration at this moment by providing
+        mapping object as ``struct`` argument.
+        """
         if struct is not None:
             if isinstance(struct, self.__class__):
                 struct = struct._Configuration__struct
