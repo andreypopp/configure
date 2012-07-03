@@ -323,6 +323,8 @@ def _timedelta_contructor(loader, node):
         return timedelta(days=num * 7)
     elif typ == "m":
         return timedelta(seconds=num * 60)
+    elif typ == "s":
+        return timedelta(seconds=num)
     else:
         raise ConfigurationError(
             "value '%s' cannot be interpreted as date range" % item)
