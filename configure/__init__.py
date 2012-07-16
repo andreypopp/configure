@@ -8,6 +8,7 @@ from types import FunctionType
 from re import compile as re_compile
 from collections import MutableMapping, Mapping
 from datetime import timedelta
+
 try:
     from yaml import Loader as Loader
 except ImportError:
