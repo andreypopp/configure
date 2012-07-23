@@ -1,4 +1,8 @@
-""" This module provides API to access YAML formatted configuration.
+"""
+
+    configure -- configuration machinery on top of YAML
+    ===================================================
+
 """
 
 import sys
