@@ -8,6 +8,6 @@ setup(
     description="configuration toolkit based on YAML",
     author="Andrey Popp",
     author_email="8mayday@gmail.com",
-    packages=["configure"],
+    py_modules=["configure"],
     test_suite="tests",
     zip_safe=False)

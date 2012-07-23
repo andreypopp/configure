@@ -1,3 +1,9 @@
+0.4
+---
+
+* remove ``configure.module`` -- it was a bad idea to synthesize new Python
+  modules on a fly
+
 0.3.4
 -----
 
