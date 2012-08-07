@@ -257,6 +257,8 @@ def configure_logging(logcfg=None, disable_existing_loggers=True):
     else:
         logcfg = {}
 
+    logcfg = dict(logcfg)
+
     if not "version" in logcfg:
         logcfg["version"] = 1
 

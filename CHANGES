@@ -1,3 +1,8 @@
+0.4.1
+-----
+
+* fix ``configure_logging`` formatters configuration
+
 0.4
 ---
 
