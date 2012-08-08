@@ -155,6 +155,9 @@ class Configuration(MutableMapping):
                 return v(self)
             if isinstance(v, Configuration):
                 return v.configure(_root=False)
+            if isinstance(v, list):
+                for x in v[:]:
+                    v[v.index(x)] = _impl(x)
             return v
 
         if _root:
