@@ -414,8 +414,11 @@ class Factory(object):
     __repr__ = __str__
 
 def _factory_constructor(loader, tag, node):
-    item = loader.construct_mapping(node)
-    return Factory(tag, item)
+    if node.value:
+        item = loader.construct_mapping(node)
+        return Factory(tag, item)
+    else:
+        return Factory(tag, {})
 
 class Obj(object):
 
