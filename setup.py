@@ -10,4 +10,5 @@ setup(
     author_email="8mayday@gmail.com",
     py_modules=["configure"],
     test_suite="tests",
+    install_requires=["pyyaml"],
     zip_safe=False)

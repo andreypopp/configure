@@ -1,3 +1,13 @@
+0.4.4
+-----
+
+* add PyYAML to requirements
+
+0.4.3
+-----
+
+* fix factories w/o args
+
 0.4.2
 -----
 
