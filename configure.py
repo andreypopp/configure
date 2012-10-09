@@ -151,7 +151,7 @@ class Configuration(MutableMapping):
             self.__struct = struct
 
         def _impl(v):
-            if isinstance(v, (Factory, Obj, Ref, Include, Extends)):
+            if isinstance(v, Directive):
                 return v(self)
             if isinstance(v, Configuration):
                 return v.configure(_root=False)
@@ -343,7 +343,12 @@ def _re_constructor(loader, node):
     item = loader.construct_scalar(node)
     return re_compile(item)
 
-class Ref(object):
+class Directive(object):
+
+    def __call__(self, ctx):
+        raise NotImplementedError()
+
+class Ref(Directive):
 
     def __init__(self, ref):
         self.ref = ref
@@ -362,7 +367,7 @@ class Ref(object):
 def _ref_constructor(loader, tag, node):
     return Ref(tag)
 
-class Factory(object):
+class Factory(Directive):
 
     def __init__(self, factory, config):
         self.factory = factory
@@ -392,14 +397,14 @@ class Factory(object):
                 raise ConfigurationError(
                     "missing '%s' argument for %s" % (a, factory))
             arg = config.pop(a)
-            if isinstance(arg, (Ref, Factory)):
+            if isinstance(arg, Directive):
                 arg = arg(ctx)
             args.append(arg)
 
         for a in argspec.args[pos_cut:]:
             if a in config:
                 arg = config.pop(a)
-                if isinstance(arg, (Ref, Factory)):
+                if isinstance(arg, Directive):
                     arg = arg(ctx)
                 kwargs[a] = arg
 
@@ -420,7 +425,7 @@ def _factory_constructor(loader, tag, node):
     else:
         return Factory(tag, {})
 
-class Obj(object):
+class Obj(Directive):
 
     def __init__(self, obj):
         self.obj = obj
@@ -434,7 +439,7 @@ class Obj(object):
 def _obj_constructor(loader, tag, node):
     return Obj(tag)
 
-class Include(object):
+class Include(Directive):
 
     def __init__(self, filename):
         self.filename = filename
@@ -445,7 +450,7 @@ class Include(object):
 def _include_constructor(loader, tag, node):
     return Include(tag)
 
-class Extends(object):
+class Extends(Directive):
 
     def __init__(self, filename, config):
         self.filename = filename
