@@ -339,8 +339,55 @@ def _timedelta_contructor(loader, node):
         raise ConfigurationError(
             "value '%s' cannot be interpreted as date range" % item)
 
+def _bytesize_constructor(loader, node):
+    item = loader.construct_scalar(node)
+
+    if not isinstance(item, basestring) or not item:
+        raise ConfigurationError(
+            "value '%s' cannot be interpreted as byte size" % item)
+
+    if item.isdigit():
+        return int(item) # bytes
+
+    num, typ = item[:-1], item[-1].lower()
+
+    if item[-2:].lower() in ('kb', 'mb', 'gb', 'tb', 'pb'):
+        num, typ = item[:-2], item[-2:-1].lower()
+    elif item[-1:].lower() in ('k', 'm', 'b', 't', 'p', 'b'):
+        num, typ = item[:-1], item[-1].lower()
+    else:
+        raise ConfigurationError(
+            "value '%s' cannot be interpreted as byte size" % item)
+
+    if not num.isdigit():
+        raise ConfigurationError(
+            "value '%s' cannot be interpreted as byte size" % item)
+
+    num = int(num)
+
+    if typ == 'b':
+        return num
+    elif typ == 'k':
+        return num * 1024
+    elif typ == 'm':
+        return num * 1024 * 1024
+    elif typ == 'g':
+        return num * 1024 * 1024 * 1024
+    elif typ == 't':
+        return num * 1024 * 1024 * 1024 * 1024
+    elif typ == 'p':
+        return num * 1024 * 1024 * 1024 * 1024 * 1024
+    else:
+        raise ConfigurationError(
+            "value '%s' cannot be interpreted as byte size" % item)
+
 def _re_constructor(loader, node):
     item = loader.construct_scalar(node)
+
+    if not isinstance(item, basestring) or not item:
+        raise ConfigurationError(
+            "value '%s' cannot be interpreted as regular expression" % item)
+
     return re_compile(item)
 
 class Directive(object):
@@ -485,6 +532,8 @@ def load(stream, constructors=None):
         loader.add_constructor("!timedelta", _timedelta_contructor)
     if not "re" in constructors:
         loader.add_constructor("!re", _re_constructor)
+    if not "bytesize" in constructors:
+        loader.add_constructor("!bytesize", _bytesize_constructor)
 
     loader.add_multi_constructor("!ref:", _ref_constructor)
     loader.add_multi_constructor("!factory:", _factory_constructor)
