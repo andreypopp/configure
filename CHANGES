@@ -1,3 +1,15 @@
+0.4.7
+-----
+
+* coerce filename to abs path
+* directory — check if it exists and create if not
+* interpolate config before YAML parsing
+
+0.4.6
+-----
+
+* bytesize
+
 0.4.5
 -----
 
