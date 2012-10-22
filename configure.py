@@ -6,7 +6,7 @@
 """
 
 import sys
-from os import path
+from os import path, mkdir
 from inspect import getargspec
 from types import FunctionType
 from re import compile as re_compile
@@ -33,13 +33,10 @@ class Configuration(MutableMapping):
     :class:`collections.MutableMapping` protocol.
     """
 
-    def __init__(self, struct=None, ctx=None, pwd=None, parent=None):
+    def __init__(self, struct=None, pwd=None, parent=None):
         self._pwd = pwd or "."
         self._parent = parent
         self.__struct = struct
-        self.__ctx = ctx or {}
-
-        self.__ctx["pwd"] = self._pwd
 
     def merge(self, config):
         """ Produce new configuration by merging ``config`` object into this
@@ -80,9 +77,7 @@ class Configuration(MutableMapping):
             raise ConfigurationError("unconfigured")
         data = self.__struct[name]
         if isinstance(data, dict):
-            return self.__class__(data, self.__ctx, parent=self, pwd=self._pwd)
-        if isinstance(data, basestring):
-            return data % self.__ctx
+            return self.__class__(data, parent=self, pwd=self._pwd)
         return data
 
     # MutableMapping
@@ -163,7 +158,7 @@ class Configuration(MutableMapping):
         if _root:
             if isinstance(self.__struct, Extends):
                 self.__struct = self.__struct(
-                    Configuration.from_dict({}, ctx=self.__ctx, pwd=self._pwd))
+                    Configuration.from_dict({}, pwd=self._pwd))
 
         for k, v in self.iteritems():
             self[k] = _impl(v)
@@ -188,6 +183,7 @@ class Configuration(MutableMapping):
             mapping of names to constructor for custom objects in YAML. Look at
             `_timedelta_constructor` and `_re_constructor` for examples.
         """
+        filename = path.abspath(filename)
         if pwd is None:
             pwd = path.dirname(filename)
         with open(filename, "r") as f:
@@ -206,19 +202,20 @@ class Configuration(MutableMapping):
             mapping of names to constructor for custom objects in YAML. Look at
             `_timedelta_constructor` and `_re_constructor` for examples.
         """
+        ctx = ctx or {}
+        ctx['pwd'] = pwd
+        string = string % ctx
         cfg = load(string, constructors=constructors)
-        return cls.from_dict(cfg, ctx=ctx, pwd=pwd)
+        return cls.from_dict(cfg, pwd=pwd)
 
     @classmethod
-    def from_dict(cls, cfg, ctx=None, pwd=None):
+    def from_dict(cls, cfg, pwd=None):
         """ Construct :class:`.Configuration` from dict ``d``.
 
         :param d:
             mapping object to use for config
-        :param ctx:
-            mapping object used for value interpolation
         """
-        return cls(cfg, ctx=ctx, pwd=pwd)
+        return cls(cfg, pwd=pwd)
 
 def format_config(config, _lvl=0):
     indent = "  " * _lvl
@@ -390,6 +387,14 @@ def _re_constructor(loader, node):
 
     return re_compile(item)
 
+def _directory_constructor(loader, node):
+    item = loader.construct_scalar(node)
+    if not path.exists(item):
+        mkdir(item)
+    elif not path.isdir(item):
+        raise ConfigurationError("'%s' is not a directory" % item)
+    return item
+
 class Directive(object):
 
     def __call__(self, ctx):
@@ -534,6 +539,8 @@ def load(stream, constructors=None):
         loader.add_constructor("!re", _re_constructor)
     if not "bytesize" in constructors:
         loader.add_constructor("!bytesize", _bytesize_constructor)
+    if not "directory" in constructors:
+        loader.add_constructor("!directory", _directory_constructor)
 
     loader.add_multi_constructor("!ref:", _ref_constructor)
     loader.add_multi_constructor("!factory:", _factory_constructor)
