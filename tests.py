@@ -12,6 +12,9 @@ class A(object):
 def a(a, b=4):
     return A(a, b=b)
 
+def kw(**kw):
+    return kw
+
 class TestCase(BaseTestCase):
 
     def config(self, v, ctx=None):
@@ -70,6 +73,16 @@ a4:
         self.assertTrue(isinstance(o, A))
         self.assertEqual(o.a, 4)
         self.assertEqual(o.b, 5)
+
+    def test_factory_kw(self):
+        c = self.config("""
+a: !factory:tests.kw
+    a: 4
+    b: 5
+        """)
+        c.configure()
+        self.assertTrue('a' in c.a)
+        self.assertTrue('b' in c.a)
 
     def test_graph(self):
         c = self.config("""

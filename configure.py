@@ -460,6 +460,13 @@ class Factory(Directive):
                     arg = arg(ctx)
                 kwargs[a] = arg
 
+        if argspec.keywords:
+            for k in config.keys():
+                arg = config.pop(k)
+                if isinstance(arg, Directive):
+                    arg = arg(ctx)
+                kwargs[k] = arg
+
         if config:
             raise ConfigurationError(
                 "extra arguments '%s' found for %s" % (config, factory))
