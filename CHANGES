@@ -1,3 +1,8 @@
+0.4.8
+-----
+
+* handle kwargs in factory directive
+
 0.4.7
 -----
 
