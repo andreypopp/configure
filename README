@@ -8,3 +8,5 @@ YAML configuration library which provides:
 
   * object level configuration (like construct this object by calling some
     function with some arguments)
+
+Development takes place at https://github.com/andreypopp/configure
