@@ -33,6 +33,9 @@ class Configuration(MutableMapping):
     :class:`collections.MutableMapping` protocol.
     """
 
+    _constructors = {}
+    _multi_constructors = {}
+
     def __init__(self, struct=None, pwd=None, parent=None):
         self._pwd = pwd or "."
         self._parent = parent
@@ -171,7 +174,8 @@ class Configuration(MutableMapping):
     __str__ = __repr__
 
     @classmethod
-    def from_file(cls, filename, ctx=None, pwd=None, constructors=None):
+    def from_file(cls, filename, ctx=None, pwd=None, constructors=None,
+            multi_constructors=None):
         """ Construct :class:`.Configuration` object by reading and parsing file
         ``filename``.
 
@@ -191,7 +195,8 @@ class Configuration(MutableMapping):
                     constructors=constructors)
 
     @classmethod
-    def from_string(cls, string, ctx=None, pwd=None, constructors=None):
+    def from_string(cls, string, ctx=None, pwd=None, constructors=None,
+            multi_constructors=None):
         """ Construct :class:`.Configuration` from ``string``.
 
         :param string:
@@ -205,7 +210,7 @@ class Configuration(MutableMapping):
         ctx = ctx or {}
         ctx['pwd'] = pwd
         string = string % ctx
-        cfg = load(string, constructors=constructors)
+        cfg = cls.load(string, constructors=constructors)
         return cls.from_dict(cfg, pwd=pwd)
 
     @classmethod
@@ -217,97 +222,56 @@ class Configuration(MutableMapping):
         """
         return cls(cfg, pwd=pwd)
 
-def format_config(config, _lvl=0):
-    indent = "  " * _lvl
-    buf = ""
-    for k, v in sorted(config.items()):
-        buf += "%s%s:\n" % (indent, k)
-        if isinstance(v, Configuration):
-            buf += format_config(v, _lvl + 1)
-        else:
-            buf += "%s%s\n" % ("  " * (_lvl + 1), v)
-    return buf
+    @classmethod
+    def load(cls, stream, constructors=None, multi_constructors=None):
+        loader = Loader(stream)
 
-def print_config(config):
-    print format_config(config)
+        cs = dict(cls._constructors)
+        if constructors:
+            cs.update(constructors)
 
-def configure_logging(logcfg=None, disable_existing_loggers=True):
-    """ Configure logging in a sane way
+        mcs = dict(cls._multi_constructors)
+        if multi_constructors:
+            mcs.update(multi_constructors)
 
-    :param logcfg:
-        may be a. a dict suitable for :func:`logging.config.dictConfig`, b.
-        "syslog" string or c. None
-    :param disable_existing_loggers:
-        if we need to disable existing loggers
-    """
-    if logcfg is not None:
-        if logcfg == "syslog":
-            logcfg = {
-                "handlers": {
-                    "syslog": {
-                        "class": "logging.handlers.SysLogHandler",
-                        "formatter": "precise",
-                    }
-                },
-                "root": {
-                    "handlers": ["syslog"],
-                    "level": "NOTSET",
-                }
-            }
-    else:
-        logcfg = {}
+        if cs:
+            for name, constructor in cs.items():
+                loader.add_constructor(name, constructor)
 
-    logcfg = dict(logcfg)
+        if mcs:
+            for name, constructor in mcs.items():
+                loader.add_multi_constructor(name, constructor)
 
-    if not "version" in logcfg:
-        logcfg["version"] = 1
+        try:
+            return loader.get_single_data()
+        finally:
+            loader.dispose()
 
-    if not "disable_existing_loggers" in logcfg:
-        logcfg["disable_existing_loggers"] = disable_existing_loggers
+    @classmethod
+    def add_constructor(cls, name):
+        if not '_constructors' in cls.__dict__:
+            cls.__dict__['_constructors'] = dict(cls._constructors)
+        cname = '!%s' % name
+        def registration(func):
+            if cname in cls._constructors:
+                raise ValueError("constructor '%s' already exist")
+            cls._constructors[cname] = func
+            return func
+        return registration
 
-    # formatters
+    @classmethod
+    def add_multi_constructor(cls, name):
+        if not '_multi_constructors' in cls.__dict__:
+            cls.__dict__['_multi_constructors'] = dict(cls._multi_constructors)
+        cname = '!%s:' % name
+        def registration(func):
+            if cname in cls._multi_constructors:
+                raise ValueError("multiconstructor '%s' already exist")
+            cls._multi_constructors[cname] = func
+            return func
+        return registration
 
-    if not "formatters" in logcfg:
-        logcfg["formatters"] = {}
-
-    if not "brief" in logcfg["formatters"]:
-        logcfg["formatters"]["brief"] = {
-            "format": "%(message)s",
-        }
-
-    if not "precise" in logcfg["formatters"]:
-        logcfg["formatters"]["precise"] = {
-            "format": "%(asctime)s %(levelname)-8s %(name)-15s %(message)s",
-        }
-
-    # handlers
-
-    if not "root" in logcfg:
-        logcfg["root"] = {
-            "handlers": ["console"],
-            "level": "NOTSET",
-        }
-
-    if not "handlers" in logcfg:
-        logcfg["handlers"] = {}
-
-    if not "syslog" in logcfg["handlers"]:
-        logcfg["handlers"]["syslog"] = {
-            "class": "logging.handlers.SysLogHandler",
-            "formatter": "precise",
-            "level": "NOTSET",
-        }
-
-    if not "console" in logcfg["handlers"]:
-        logcfg["handlers"]["console"] = {
-            "class": "logging.StreamHandler",
-            "formatter": "precise",
-            "level": "NOTSET",
-        }
-
-    from logging.config import dictConfig
-    dictConfig(logcfg)
-
+@Configuration.add_constructor('timedelta')
 def _timedelta_contructor(loader, node):
     item = loader.construct_scalar(node)
 
@@ -336,6 +300,7 @@ def _timedelta_contructor(loader, node):
         raise ConfigurationError(
             "value '%s' cannot be interpreted as date range" % item)
 
+@Configuration.add_constructor('bytesize')
 def _bytesize_constructor(loader, node):
     item = loader.construct_scalar(node)
 
@@ -378,6 +343,7 @@ def _bytesize_constructor(loader, node):
         raise ConfigurationError(
             "value '%s' cannot be interpreted as byte size" % item)
 
+@Configuration.add_constructor('re')
 def _re_constructor(loader, node):
     item = loader.construct_scalar(node)
 
@@ -387,6 +353,7 @@ def _re_constructor(loader, node):
 
     return re_compile(item)
 
+@Configuration.add_constructor('directory')
 def _directory_constructor(loader, node):
     item = loader.construct_scalar(node)
     if not path.exists(item):
@@ -416,6 +383,7 @@ class Ref(Directive):
 
     __repr__ = __str__
 
+@Configuration.add_multi_constructor('ref')
 def _ref_constructor(loader, tag, node):
     return Ref(tag)
 
@@ -477,9 +445,10 @@ class Factory(Directive):
 
     __repr__ = __str__
 
+@Configuration.add_multi_constructor('factory')
 def _factory_constructor(loader, tag, node):
     if node.value:
-        item = loader.construct_mapping(node)
+        item = loader.construct_mapping(node, deep=True)
         return Factory(tag, item)
     else:
         return Factory(tag, {})
@@ -495,6 +464,7 @@ class Obj(Directive):
         except ImportStringError as e:
             raise ConfigurationError("cannot import obj: %s" % e)
 
+@Configuration.add_multi_constructor('obj')
 def _obj_constructor(loader, tag, node):
     return Obj(tag)
 
@@ -506,6 +476,7 @@ class Include(Directive):
     def __call__(self, ctx):
         return Configuration.from_file(path.join(ctx._pwd, self.filename))
 
+@Configuration.add_multi_constructor('include')
 def _include_constructor(loader, tag, node):
     return Include(tag)
 
@@ -532,37 +503,16 @@ class Extends(Directive):
     def __contains__(self, name):
         return name in self.config
 
+@Configuration.add_multi_constructor('extends')
 def _extends_constructor(loader, tag, node):
-    item = loader.construct_mapping(node)
+    item = loader.construct_mapping(node, deep=True)
     return Extends(tag, item)
 
-def load(stream, constructors=None):
-    loader = Loader(stream)
-    constructors = constructors or {}
-
-    if not "timedelta" in constructors:
-        loader.add_constructor("!timedelta", _timedelta_contructor)
-    if not "re" in constructors:
-        loader.add_constructor("!re", _re_constructor)
-    if not "bytesize" in constructors:
-        loader.add_constructor("!bytesize", _bytesize_constructor)
-    if not "directory" in constructors:
-        loader.add_constructor("!directory", _directory_constructor)
-
-    loader.add_multi_constructor("!ref:", _ref_constructor)
-    loader.add_multi_constructor("!factory:", _factory_constructor)
-    loader.add_multi_constructor("!obj:", _obj_constructor)
-    loader.add_multi_constructor("!extends:", _extends_constructor)
-    loader.add_multi_constructor("!include:", _extends_constructor)
-
-    if constructors:
-        for name, constructor in constructors.items():
-            loader.add_constructor("!" + name, constructor)
-
-    try:
-        return loader.get_single_data()
-    finally:
-        loader.dispose()
+@Configuration.add_constructor('logging')
+def _logging_constructor(loader, node):
+    config = loader.construct_mapping(node, deep=True)
+    disable_existing_loggers = config.pop('disable_existing_loggers', False)
+    configure_logging(config, disable_existing_loggers=disable_existing_loggers)
 
 def import_string(import_name, silent=False):
     """Imports an object based on a string.  This is useful if you want to
@@ -653,7 +603,98 @@ class ImportStringError(ImportError):
         return '<%s(%r, %r)>' % (self.__class__.__name__, self.import_name,
                                  self.exception)
 
+def format_config(config, _lvl=0):
+    indent = "  " * _lvl
+    buf = ""
+    for k, v in sorted(config.items()):
+        buf += "%s%s:\n" % (indent, k)
+        if isinstance(v, Configuration):
+            buf += format_config(v, _lvl + 1)
+        else:
+            buf += "%s%s\n" % ("  " * (_lvl + 1), v)
+    return buf
+
+def print_config(config):
+    print format_config(config)
+
 def obj_by_ref(o, path):
     for s in path.split("."):
         o = getattr(o, s)
     return o
+
+def configure_logging(logcfg=None, disable_existing_loggers=True):
+    """ Configure logging in a sane way
+
+    :param logcfg:
+        may be a. a dict suitable for :func:`logging.config.dictConfig`, b.
+        "syslog" string or c. None
+    :param disable_existing_loggers:
+        if we need to disable existing loggers
+    """
+    if logcfg is not None:
+        if logcfg == "syslog":
+            logcfg = {
+                "handlers": {
+                    "syslog": {
+                        "class": "logging.handlers.SysLogHandler",
+                        "formatter": "precise",
+                    }
+                },
+                "root": {
+                    "handlers": ["syslog"],
+                    "level": "NOTSET",
+                }
+            }
+    else:
+        logcfg = {}
+
+    logcfg = dict(logcfg)
+
+    if not "version" in logcfg:
+        logcfg["version"] = 1
+
+    if not "disable_existing_loggers" in logcfg:
+        logcfg["disable_existing_loggers"] = disable_existing_loggers
+
+    # formatters
+
+    if not "formatters" in logcfg:
+        logcfg["formatters"] = {}
+
+    if not "brief" in logcfg["formatters"]:
+        logcfg["formatters"]["brief"] = {
+            "format": "%(message)s",
+        }
+
+    if not "precise" in logcfg["formatters"]:
+        logcfg["formatters"]["precise"] = {
+            "format": "%(asctime)s %(levelname)-8s %(name)-15s %(message)s",
+        }
+
+    # handlers
+
+    if not "root" in logcfg:
+        logcfg["root"] = {
+            "handlers": ["console"],
+            "level": "NOTSET",
+        }
+
+    if not "handlers" in logcfg:
+        logcfg["handlers"] = {}
+
+    if not "syslog" in logcfg["handlers"]:
+        logcfg["handlers"]["syslog"] = {
+            "class": "logging.handlers.SysLogHandler",
+            "formatter": "precise",
+            "level": "NOTSET",
+        }
+
+    if not "console" in logcfg["handlers"]:
+        logcfg["handlers"]["console"] = {
+            "class": "logging.StreamHandler",
+            "formatter": "precise",
+            "level": "NOTSET",
+        }
+
+    from logging.config import dictConfig
+    dictConfig(logcfg)
