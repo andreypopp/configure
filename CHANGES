@@ -1,3 +1,19 @@
+0.5
+---
+
+* constructors and multi constructors now can be registered via
+  Configuration.add_constructor and Configuration.add_multi_constructor
+  decorators
+
+* fix serious bug with factory and obj directives: previously they dropped away
+  nested objects such as lists and/or mappings
+
+* configure_logging call now can be made inside config via !logging constructor
+
+* Configuration.configure() now called inside
+  Configuration.{from_file,from_string,from_dict}() class methods, controlled
+  via configure=True keyword argument
+
 0.4.8
 -----
 
