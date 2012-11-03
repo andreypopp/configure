@@ -175,7 +175,7 @@ class Configuration(MutableMapping):
 
     @classmethod
     def from_file(cls, filename, ctx=None, pwd=None, constructors=None,
-            multi_constructors=None):
+            multi_constructors=None, configure=True):
         """ Construct :class:`.Configuration` object by reading and parsing file
         ``filename``.
 
@@ -192,11 +192,13 @@ class Configuration(MutableMapping):
             pwd = path.dirname(filename)
         with open(filename, "r") as f:
             return cls.from_string(f.read(), ctx=ctx, pwd=pwd,
-                    constructors=constructors)
+                    constructors=constructors,
+                    multi_constructors=multi_constructors,
+                    configure=configure)
 
     @classmethod
     def from_string(cls, string, ctx=None, pwd=None, constructors=None,
-            multi_constructors=None):
+            multi_constructors=None, configure=True):
         """ Construct :class:`.Configuration` from ``string``.
 
         :param string:
@@ -210,17 +212,21 @@ class Configuration(MutableMapping):
         ctx = ctx or {}
         ctx['pwd'] = pwd
         string = string % ctx
-        cfg = cls.load(string, constructors=constructors)
-        return cls.from_dict(cfg, pwd=pwd)
+        cfg = cls.load(string, constructors=constructors,
+                multi_constructors=multi_constructors)
+        return cls.from_dict(cfg, pwd=pwd, configure=configure)
 
     @classmethod
-    def from_dict(cls, cfg, pwd=None):
+    def from_dict(cls, cfg, pwd=None, configure=True):
         """ Construct :class:`.Configuration` from dict ``d``.
 
         :param d:
             mapping object to use for config
         """
-        return cls(cfg, pwd=pwd)
+        c = cls(cfg, pwd=pwd)
+        if configure:
+            c.configure()
+        return c
 
     @classmethod
     def load(cls, stream, constructors=None, multi_constructors=None):
