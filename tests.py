@@ -3,17 +3,21 @@
 from unittest import TestCase as BaseTestCase
 from configure import Configuration, Ref, Factory
 
+
 class A(object):
 
     def __init__(self, a, b=3):
         self.a = a
         self.b = b
 
+
 def a(a, b=4):
     return A(a, b=b)
 
+
 def kw(**kw):
     return kw
+
 
 class TestCase(BaseTestCase):
 
