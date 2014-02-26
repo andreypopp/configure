@@ -14,7 +14,7 @@ from collections import MutableMapping, Mapping
 from datetime import timedelta
 
 try:
-    from yaml import Loader as Loader
+    from yaml import CLoader as Loader
 except ImportError:
     from yaml import Loader
 
