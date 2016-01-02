@@ -494,7 +494,7 @@ class Extends(Directive):
 
     def __call__(self, ctx):
         sup = Configuration.from_file(path.join(ctx._pwd, self.filename))
-        cfg = Configuration.from_dict(self.config)
+        cfg = Configuration.from_dict(self.config, configure=False)
         return sup + cfg
 
     def __iter__(self):
