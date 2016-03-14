@@ -562,7 +562,10 @@ def import_string(import_name, silent=False):
             return sys.modules[modname]
     except ImportError as e:
         if not silent:
-            raise ImportStringError(import_name, e)
+            if sys.version_info.major == 2:
+                exec("raise ImportStringError(import_name, e), None, sys.exc_info()[2]")  # Get around SyntaxError in Py3
+            else:
+                raise ImportStringError(import_name, e).with_traceback(sys.exc_info()[2])
 
 class ImportStringError(ImportError):
     """Provides information about a failed :func:`import_string` attempt.
