@@ -4,7 +4,7 @@
     ===================================================
 
 """
-
+from __future__ import print_function
 import sys
 from os import path, mkdir
 from inspect import getargspec
@@ -163,7 +163,7 @@ class Configuration(MutableMapping):
                 self.__struct = self.__struct(
                     Configuration.from_dict({}, pwd=self._pwd))
 
-        for k, v in self.iteritems():
+        for k, v in self.items():
             self[k] = _impl(v)
 
         return self
@@ -560,9 +560,9 @@ def import_string(import_name, silent=False):
             modname = module + '.' + obj
             __import__(modname)
             return sys.modules[modname]
-    except ImportError, e:
+    except ImportError as e:
         if not silent:
-            raise ImportStringError(import_name, e), None, sys.exc_info()[2]
+            raise ImportStringError(import_name, e)
 
 class ImportStringError(ImportError):
     """Provides information about a failed :func:`import_string` attempt.
@@ -621,7 +621,7 @@ def format_config(config, _lvl=0):
     return buf
 
 def print_config(config):
-    print format_config(config)
+    print(format_config(config))
 
 def obj_by_ref(o, path):
     for s in path.split("."):
